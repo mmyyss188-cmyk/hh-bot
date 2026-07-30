@@ -49,7 +49,7 @@ async def process_captcha(callback_query: types.CallbackQuery):
         
         # Твоя реальная прямая ссылка на канал (без заявок)
         inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-            [types.InlineKeyboardButton(text="🔥 ВХОД В HENTAI HEAVEN 🔞", url="https://t.me")]
+            [types.InlineKeyboardButton(text="🔥 ВХОД В HENTAI HEAVEN 🔞", url="https://t.me/+G1yVgumeG35iNTAy")]
         ])
         
         await bot.send_message(
