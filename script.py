@@ -11,17 +11,14 @@ TOKEN = "8959905999:AAG53M22ecGCIZf5o0Cguu3jWR4Aap6OxZM"
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# 1. Ловим заявку, одобряем юзера и кидаем ему капчу (проверку)
-@dp.chat_join_request()
-async def approve_request(update: types.ChatJoinRequest):
+# 1. Ловим команду /start, когда челик заходит прямо в бота
+@dp.message(Command("start"))
+async def cmd_start(message: types.Message):
     try:
-        # Автоматом одобряем заявку в канал, чтобы юзер зафиксировался
-        await update.approve()
-        
         captcha_text = (
             "⚠️ **ПОДТВЕРЖДЕНИЕ ЧЕЛОВЕКА** ⚠️\n\n"
-            "Вы подали заявку в канал **Hentai Heaven**.\n"
-            "Чтобы доказать, что вы не робот-спамер, нажмите на кнопку ниже 👇"
+            "Вы коснулись бота-модератора канала **Hentai Heaven**.\n"
+            "Чтобы доказать, что вы не робот-спамер и получить прямую ссылку на вход, нажмите кнопку ниже 👇"
         )
         
         # Кнопка проверки (Капча)
@@ -29,17 +26,16 @@ async def approve_request(update: types.ChatJoinRequest):
             [types.InlineKeyboardButton(text="🤖 Я НЕ РОБОТ (ПРОЙТИ ПРОВЕРКУ)", callback_data="pass_captcha")]
         ])
         
-        await bot.send_message(
-            chat_id=update.from_user.id, 
+        await message.answer(
             text=captcha_text, 
             parse_mode=ParseMode.MARKDOWN, 
             reply_markup=inline_keyboard
         )
-        print(f"⏳ Выслана капча юзеру: {update.from_user.id}")
+        print(f"⏳ Выслана капча юзеру в ЛС: {message.from_user.id}")
     except Exception as e:
         print(f"❌ Ошибка при отправке капчи: {e}")
 
-# 2. Ловим клик по кнопке проверки и выдаем прямую ссылку
+# 2. Ловим клик по кнопке проверки и выдаем прямую ссылку на канал
 @dp.callback_query(lambda c: c.data == "pass_captcha")
 async def process_captcha(callback_query: types.CallbackQuery):
     try:
@@ -48,11 +44,10 @@ async def process_captcha(callback_query: types.CallbackQuery):
         
         success_text = (
             "✅ **Проверка успешно пройдена!**\n\n"
-            "Твоя заявка уже одобрена ботом-модератором.\n"
-            "Жми на кнопку ниже, чтобы войти в канал напрямую и сразу перейти к просмотру горячих анимаций MapleStar! 👇🔞"
+            "Жми на кнопку ниже, чтобы войти в канал напрямую без всяких ожиданий и сразу перейти к просмотру сочных анимаций MapleStar! 👇🔞"
         )
         
-        # Твоя реальная прямая ссылка на канал
+        # Твоя реальная прямая ссылка на канал (без заявок)
         inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
             [types.InlineKeyboardButton(text="🔥 ВХОД В HENTAI HEAVEN 🔞", url="https://t.me")]
         ])
@@ -63,9 +58,8 @@ async def process_captcha(callback_query: types.CallbackQuery):
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=inline_keyboard
         )
-        print(f"🚀 Юзер {callback_query.from_user.id} успешно прошел проверку!")
+        print(f"🚀 Юзер {callback_query.from_user.id} прошел капчу напрямую через старт!")
         
-        # Отвечаем телеграму, что клик обработан
         await callback_query.answer()
     except Exception as e:
         print(f"❌ Ошибка при прохождении капчи: {e}")
@@ -81,7 +75,7 @@ async def main():
     site = web.TCPSite(runner, '0.0.0.0', int(os.environ.get("PORT", 8080)))
     asyncio.create_task(site.start())
     
-    print("🤖 Бот с капчей запускается в облаке...")
+    print("🤖 Бот с прямой капчей через /start запускается...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
