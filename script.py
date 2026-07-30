@@ -21,7 +21,7 @@ async def approve_request(update: types.ChatJoinRequest):
         )
         # ЗАМЕНИ НА СВОЮ ССЫЛКУ ИЗ НАСТРОЕК КАНАЛА
         inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-            [types.InlineKeyboardButton(text="🔥 ВХОД В HENTAI HEAVEN 🔞", url="https://t.me")]
+            [types.InlineKeyboardButton(text="🔥 ВХОД В HENTAI HEAVEN 🔞", url="https://t.me/+2HHgCJmG5_AyOWZi")]
         ])
         await bot.send_message(chat_id=update.from_user.id, text=welcome_text, parse_mode=ParseMode.MARKDOWN, reply_markup=inline_keyboard)
         print(f"🚀 Одобрен юзер: {update.from_user.id}")
