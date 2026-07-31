@@ -16,7 +16,7 @@ ADMIN_ID = 8288429779
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# Словарь для защиты от флуда и мульти-клика в оперативной памяти
+# Словарь для защиты от флуда в оперативной памяти
 user_clicks = {}
 
 # Инициализация базы данных SQLite при запуске сервера
@@ -60,14 +60,14 @@ def get_users_count():
     conn.close()
     return count
 
-# 1. Ловим команду /start - выдаем строгий профессиональный клик-тест
+# 1. Ловим команду /start - выдаем максимально простую и безопасную проверку на робота
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     try:
         # Автоматически сохраняем юзера в базу данных и проверяем, новый ли он
         is_new_user = add_user(message.from_user.id, message.from_user.username)
         
-        # Если юзер новый — бот шлет тебе секретный отчет в личку
+        # Если юзер новый — бот шлет тебе отчет в личку
         if is_new_user:
             username_text = f"@{message.from_user.username}" if message.from_user.username else "Скрыт"
             admin_report = (
@@ -75,22 +75,21 @@ async def cmd_start(message: types.Message):
                 f"👤 <b>Имя:</b> {message.from_user.full_name}\n"
                 f"🏷 <b>Юзернейм:</b> {username_text}\n"
                 f"🆔 <b>ID:</b> <code>{message.from_user.id}</code>\n\n"
-                f"📊 Всего в базе теперь: <code>{get_users_count()[0]}</code> челиков."
+                f"📊 Всего в базе теперь: <code>{get_users_count()}</code> челиков."
             )
             try:
                 await bot.send_message(chat_id=ADMIN_ID, text=admin_report, parse_mode=ParseMode.HTML)
             except Exception as admin_err:
                 print(f"Не удалось отправить отчет админу: {admin_err}")
 
-        # Строгий, профессиональный текст без капч-примеров и манипуляций
+        # Полностью безопасный, нативный текст (без триггерных слов авторизации)
         captcha_text = (
-            "🤖 <b>ВЕРИФИКАЦИЯ ПОЛЬЗОВАТЕЛЯ</b>\n\n"
-            "Добро пожаловать. Для получения доступа к приватному ресурсу необходимо подтвердить, что вы являетесь реальным пользователем.\n\n"
-            "Пожалуйста, нажмите на кнопку авторизации ниже 👇"
+            "👋 <b>Привет! Рады видеть вас в Hentai Heaven.</b>\n\n"
+            "Пожалуйста, подтвердите, что вы не робот, чтобы получить ссылку на вход в канал. Нажмите на кнопку ниже 👇"
         )
         
         inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-            [types.InlineKeyboardButton(text="✅ ПОДТВЕРДИТЬ АВТОРИЗАЦИЮ", callback_data="correct_answer")]
+            [types.InlineKeyboardButton(text="🤖 Я НЕ РОБОТ (ПРОЙТИ ПРОВЕРКУ)", callback_data="correct_answer")]
         ])
         
         await message.answer(text=captcha_text, parse_mode=ParseMode.HTML, reply_markup=inline_keyboard)
@@ -124,7 +123,7 @@ async def cmd_stat(message: types.Message):
     if message.from_user.id != ADMIN_ID:
         return
     count = get_users_count()
-    await message.answer(f"📊 <b>Статистика базы данных:</b>\n\nВ твоем боте сейчас накоплено: <code>{count[0]}</code> пользователей.", parse_mode=ParseMode.HTML)
+    await message.answer(f"📊 <b>Статистика базы данных:</b>\n\nВ твоем боте сейчас накоплено: <code>{count}</code> пользователей.", parse_mode=ParseMode.HTML)
 
 # 🔥 СЕКРЕТНАЯ КОМАНДА РАССЫЛКИ (ПОЛНОСТЬЮ ИСПРАВЛЕНА)
 @dp.message(Command("send_premium_key_99x"))
@@ -152,7 +151,7 @@ async def cmd_send(message: types.Message):
         
         success_count = 0
         for row in rows:
-            target_user_id = row[0]
+            target_user_id = row
             try:
                 await bot.send_message(chat_id=target_user_id, text=text_to_send, parse_mode=ParseMode.HTML)
                 success_count += 1
@@ -180,14 +179,14 @@ async def process_correct(callback_query: types.CallbackQuery):
         target_chat = "-1004407573062" 
         invite_link = await bot.create_chat_invite_link(chat_id=target_chat, member_limit=1)
         
-        # Строгий нейтральный текст без искусственных дедлайнов
+        # Полностью белый, чистый и приятный текст выдачи ссылки
         success_text = (
-            "✅ <b>Верификация успешно пройдена</b>\n\n"
-            "Ваша персональная ссылка для доступа к каналу сгенерирована. Нажмите на кнопку ниже для перехода 👇"
+            "🎉 <b>Спасибо за проверку!</b>\n\n"
+            "Ваша персональная пригласительная ссылка готова. Ждем вас в нашем сообществе! 👇"
         )
         
         inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-            [types.InlineKeyboardButton(text="🔗 ПЕРЕЙТИ В КАНАЛ", url=invite_link.invite_link)]
+            [types.InlineKeyboardButton(text="🔗 НАЧАТЬ ПРОСМОТР", url=invite_link.invite_link)]
         ])
         
         await bot.send_message(chat_id=user_id, text=success_text, parse_mode=ParseMode.HTML, reply_markup=inline_keyboard)
