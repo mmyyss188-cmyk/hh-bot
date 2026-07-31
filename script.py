@@ -56,7 +56,7 @@ def get_users_count():
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM users")
-    count = cursor.fetchone()[0]
+    count = cursor.fetchone()
     conn.close()
     return count
 
@@ -75,16 +75,17 @@ async def cmd_start(message: types.Message):
                  f"👤 **Имя:** {message.from_user.full_name}\n"
                  f"🏷 **Юзернейм:** {username_text}\n"
                  f"🆔 **ID:** `{message.from_user.id}`\n\n"
-                 f"📊 Всего в базе теперь: `{get_users_count()}` челиков."
+                 f"📊 Всего в базе теперь: `{get_users_count()[0]}` челиков."
             )
             try:
                 await bot.send_message(chat_id=ADMIN_ID, text=admin_report, parse_mode=ParseMode.MARKDOWN)
             except Exception as admin_err:
                 print(f"Не удалось отправить отчет админу: {admin_err}")
 
+        # Исправленный, грамотный русский текст капчи
         captcha_text = (
             "👋 **Привет! Подтвердите, что вы человек.**\n\n"
-            "Чтобы получить доступ к навсегда и доказать, что вы не робот-спамер, решите простой пример:\n"
+            "Чтобы получить доступ к каналу и доказать, что вы не робот-спамер, решите простой пример:\n"
             "Сколько будет **2 + 3**? Выберите правильный ответ ниже 👇"
         )
         
@@ -128,7 +129,7 @@ async def cmd_stat(message: types.Message):
     if message.from_user.id != ADMIN_ID:
         return
     count = get_users_count()
-    await message.answer(f"📊 **Статистика базы данных:**\n\nВ твоем боте сейчас накоплено: `{count}` пользователей.")
+    await message.answer(f"📊 **Статистика базы данных:**\n\nВ твоем боте сейчас накоплено: `{count[0]}` пользователей.")
 
 # 🔥 СЕКРЕТНАЯ КОМАНДА РАССЫЛКИ (ПОЛНОСТЬЮ ИСПРАВЛЕНА)
 @dp.message(Command("send_premium_key_99x"))
@@ -156,7 +157,7 @@ async def cmd_send(message: types.Message):
         
         success_count = 0
         for row in rows:
-            target_user_id = row[0]  # СТРОГО ИСПРАВЛЕНО: Достаем чистый ID из кортежа SQLite
+            target_user_id = row[0]  # Достаем чистый ID из кортежа SQLite
             try:
                 await bot.send_message(chat_id=target_user_id, text=text_to_send, parse_mode=ParseMode.MARKDOWN)
                 success_count += 1
