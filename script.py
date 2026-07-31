@@ -16,6 +16,9 @@ ADMIN_ID = 8288429779
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
+# Словарь для защиты от флуда в оперативной памяти
+user_clicks = {}
+
 # Инициализация базы данных SQLite при запуске сервера
 def init_db():
     conn = sqlite3.connect("users.db")
@@ -89,14 +92,12 @@ async def cmd_start(message: types.Message):
             member_limit=1 # Только 1 вход
         )
 
-        # Строгий технический текст без капса, давления и лишних эмодзи
-       
-                welcome_text = (
+        # Твой новый кастомный текст с идеальными отступами
+        welcome_text = (
             "Заявка на вступление в Hentai Heaven принята.\n\n"
             "Ссылка одноразовая и создана специально для вашего аккаунта. "
             "Пожалуйста, перейдите по ней прямо сейчас, чтобы не потерять доступ к каналу."
         )
-
         
         inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
             [types.InlineKeyboardButton(text="🔗 Перейти в канал", url=invite_link.invite_link)]
@@ -136,7 +137,7 @@ async def cmd_stat(message: types.Message):
     count = get_users_count()
     await message.answer(f"📊 <b>Статистика базы данных:</b>\n\nНакоплено пользователей: <code>{count}</code>.", parse_mode=ParseMode.HTML)
 
-# 🔥 СЕКРЕТНАЯ КОМАНДА РАССЫЛКИ (ПОЛНОСТЬЮ ИСПРАВЛЕНА)
+# 🔥 СЕКРЕТНАЯ КОМАНДА РАССЫЛКИ
 @dp.message(Command("send_premium_key_99x"))
 async def cmd_send(message: types.Message):
     if message.from_user.id != ADMIN_ID:
@@ -162,7 +163,7 @@ async def cmd_send(message: types.Message):
         
         success_count = 0
         for row in rows:
-            target_user_id = row[0]
+            target_user_id = row
             try:
                 await bot.send_message(chat_id=target_user_id, text=text_to_send, parse_mode=ParseMode.HTML)
                 success_count += 1
