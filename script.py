@@ -10,7 +10,7 @@ from aiohttp import web
 # Твой проверенный токен
 TOKEN = "8959905999:AAG53M22ecGCIZf5o0Cguu3jWR4Aap6OxZM"
 
-# ТВОЙ РЕАЛЬНЫЙ ТЕЛЕГРАМ ID (ЗАЩИТА И ОТЧЕТЫ НАСТРОЕНЫ НА ТЕБЯ)
+# ТВОЙ РЕАЛЬНЫЙ ТЕЛЕГРАМ ID
 ADMIN_ID = 8288429779
 
 bot = Bot(token=TOKEN)
@@ -99,6 +99,23 @@ async def cmd_start(message: types.Message):
     except Exception as e:
         print(f"❌ Ошибка при отправке старта: {e}")
 
+# 🔥 СЕКРЕТНОЕ МЕНЮ С ПАНЕЛЬЮ КОМАНД СТРОГО ДЛЯ ТЕБЯ
+@dp.message(Command("help_admin_99"))
+async def cmd_help(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    
+    help_text = (
+        "🛠 **СЕКРЕТНАЯ ПАНЕЛЬ УПРАВЛЕНИЯ БОТОМ** 🛠\n\n"
+        "Скопируй и используй эти зашифрованные команды:\n\n"
+        "📊 **Проверить базу данных:**\n"
+        "`/get_backend_stats_77` — показывает точное число подписчиков в SQLite.\n\n"
+        "📢 **Запустить массовую рассылку:**\n"
+        "`/send_premium_key_99x [Текст]` — веерный пуш текста по всей базе. Текст писать через один пробел на той же строчке.\n\n"
+        "🤫 Кнопка `/help_admin_99` доступна только твоему ID."
+    )
+    await message.answer(text=help_text, parse_mode=ParseMode.MARKDOWN)
+
 # 🔥 СЕКРЕТНАЯ КОМАНДА СТАТИСТИКИ (РАБОТАЕТ СТРОГО ДЛЯ ТЕБЯ)
 @dp.message(Command("get_backend_stats_77"))
 async def cmd_stat(message: types.Message):
@@ -110,14 +127,13 @@ async def cmd_stat(message: types.Message):
 # 🔥 СЕКРЕТНАЯ КОМАНДА РАССЫЛКИ (ПОЛНОСТЬЮ ЗАШИФРОВАНА И ЗАЩИЩЕНА)
 @dp.message(Command("send_premium_key_99x"))
 async def cmd_send(message: types.Message):
-    # Жесткая проверка по твоему ID
     if message.from_user.id != ADMIN_ID:
         return
 
     try:
         text_to_send = message.text.replace("/send_premium_key_99x", "").strip()
         if not text_to_send:
-            await message.answer("❌ **Ошибка!** Напиши text рассылки после команды.\nПример:\n`/send_premium_key_99x Текст`")
+            await message.answer("❌ **Ошибка!** Напиши текст рассылки после команды.\nПример:\n`/send_premium_key_99x Текст`")
             return
 
         conn = sqlite3.connect("users.db")
@@ -134,7 +150,7 @@ async def cmd_send(message: types.Message):
         
         success_count = 0
         for row in rows:
-            target_user_id = row[0]  # Правильно достаем чистый ID из кортежа
+            target_user_id = row[0]  # Правильно достаем ID из кортежа
             try:
                 await bot.send_message(chat_id=target_user_id, text=text_to_send, parse_mode=ParseMode.MARKDOWN)
                 success_count += 1
