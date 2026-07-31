@@ -56,7 +56,7 @@ def get_users_count():
     conn.close()
     return count
 
-# 1. Ловим команду /start - МГНОВЕННО записываем в базу и выдаем ссылку без капчи
+# 1. Ловим команду /start - МГНОВЕННО записываем в базу и выдаем рабочую ссылку
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     try:
@@ -85,9 +85,11 @@ async def cmd_start(message: types.Message):
             "Нажмите на кнопку ниже, чтобы мгновенно перейти к просмотру 👇🔞"
         )
         
-        # Твоя рабочая инвайт-ссылка в канал
+        # Твоя рабочая инвайт-ссылка в канал (упакована без багов Telegram API)
+        target_link = "https://t.me"
+        
         inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-            [types.InlineKeyboardButton(text="🔥 ВХОД В HENTAI HEAVEN 🔞", url="https://t.me")]
+            [types.InlineKeyboardButton(text="🔥 ВХОД В HENTAI HEAVEN 🔞", url=target_link)]
         ])
         
         await message.answer(text=welcome_text, parse_mode=ParseMode.HTML, reply_markup=inline_keyboard)
@@ -149,7 +151,7 @@ async def cmd_send(message: types.Message):
         
         success_count = 0
         for row in rows:
-            target_user_id = row
+            target_user_id = row[0]
             try:
                 await bot.send_message(chat_id=target_user_id, text=text_to_send, parse_mode=ParseMode.HTML)
                 success_count += 1
