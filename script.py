@@ -7,7 +7,7 @@ from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiohttp import web
 
-# Твой проверенный токен
+# Твой рабочий токен
 TOKEN = "8959905999:AAG53M22ecGCIZf5o0Cguu3jWR4Aap6OxZM"
 
 bot = Bot(token=TOKEN)
@@ -99,16 +99,11 @@ async def process_correct(callback_query: types.CallbackQuery):
         # УДАЛЕНИЕ СООБЩЕНИЯ (Защита от мульти-клика): стираем капчу сразу
         await bot.delete_message(chat_id=user_id, message_id=callback_query.message.message_id)
         
-        # Твой приватный канал Hentai Heaven. Ссылка на него: https://t.me
-        # Так как ссылка приватная, мы используем хэш-хвостик 'G1yVgumeG35iNTAy' для создания динамических инвайтов
-        target_chat = "+G1yVgumeG35iNTAy" 
+        # Твой проверенный цифровой ID канала Hentai Heaven
+        target_chat = "-1004407573062" 
         
         # ДИНАМИЧЕСКИЕ ССЫЛКИ: создаем одноразовую ссылку на 5 минут строго для 1 человека
-        invite_link = await bot.create_chat_invite_link(
-            chat_id=target_chat,
-            expire_date=int(time.time() + 300), # Сгорает через 5 минут
-            member_limit=1 # Строго 1 вход
-        )
+        invite_link = await bot.create_chat_invite_link(chat_id=target_chat, expire_date=int(time.time() + 300), member_limit=1)
         
         # Финальный текст с инструкцией для обхода блокировок на iOS
         success_text = (
