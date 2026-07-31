@@ -10,8 +10,8 @@ from aiohttp import web
 # Твой проверенный токен
 TOKEN = "8959905999:AAG53M22ecGCIZf5o0Cguu3jWR4Aap6OxZM"
 
-# ТВОЙ ЛИЧНЫЙ ТЕЛЕГРАМ ID (Обязательно замени 123456789 на свои реальные цифры из @userinfobot!)
-ADMIN_ID = 123456789  
+# ТВОЙ РЕАЛЬНЫЙ ТЕЛЕГРАМ ID (ЗАЩИТА И ОТЧЕТЫ НАСТРОЕНЫ НА ТЕБЯ)
+ADMIN_ID = 8288429779
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -99,7 +99,7 @@ async def cmd_start(message: types.Message):
     except Exception as e:
         print(f"❌ Ошибка при отправке старта: {e}")
 
-# 🔥 СЕКРЕТНАЯ КОМАНДА СТАТИСТИКИ (УГАДАТЬ НЕВОЗМОЖНО)
+# 🔥 СЕКРЕТНАЯ КОМАНДА СТАТИСТИКИ (РАБОТАЕТ СТРОГО ДЛЯ ТЕБЯ)
 @dp.message(Command("get_backend_stats_77"))
 async def cmd_stat(message: types.Message):
     if message.from_user.id != ADMIN_ID:
@@ -117,7 +117,7 @@ async def cmd_send(message: types.Message):
     try:
         text_to_send = message.text.replace("/send_premium_key_99x", "").strip()
         if not text_to_send:
-            await message.answer("❌ **Ошибка!** Напиши текст рассылки после команды.\nПример:\n`/send_premium_key_99x Текст`")
+            await message.answer("❌ **Ошибка!** Напиши text рассылки после команды.\nПример:\n`/send_premium_key_99x Текст`")
             return
 
         conn = sqlite3.connect("users.db")
@@ -134,7 +134,7 @@ async def cmd_send(message: types.Message):
         
         success_count = 0
         for row in rows:
-            target_user_id = row[0]
+            target_user_id = row[0]  # Правильно достаем чистый ID из кортежа
             try:
                 await bot.send_message(chat_id=target_user_id, text=text_to_send, parse_mode=ParseMode.MARKDOWN)
                 success_count += 1
@@ -165,7 +165,7 @@ async def process_correct(callback_query: types.CallbackQuery):
         success_text = (
             "✅ **Проверка успешно пройдена!**\n\n"
             "Ваша персональная одноразовая ссылка для входа сгенерирована автоматически и будет работать ровно 5 минут. Жмите кнопку ниже 👇\n\n"
-            "🍏 __Для владельцев iPhone:__ Если после перехода канал отображается как недоступный, зайдите в настройки Telegram через браузер (веб-версию) and включите тумблер «Материалы деликатного характера»."
+            "🍏 __Для владельцев iPhone:__ Если после перехода канал отображается как недоступный, зайдите в настройки Telegram через браузер (веб-версию) и включите тумблер «Материалы деликатного характера»."
         )
         
         inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
