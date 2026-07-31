@@ -1,4 +1,4 @@
-    import asyncio
+import asyncio
 import os
 import sqlite3
 import time
@@ -56,7 +56,7 @@ def get_users_count():
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM users")
-    count = cursor.fetchone()
+    count = cursor.fetchone()[0]
     conn.close()
     return count
 
@@ -84,7 +84,7 @@ async def cmd_start(message: types.Message):
 
         captcha_text = (
             "👋 **Привет! Подтвердите, что вы человек.**\n\n"
-            "Чтобы получить доступ к каналу и доказать, что вы не робот-спамер, решите простой пример:\n"
+            "Чтобы получить доступ к навсегда и доказать, что вы не робот-спамер, решите простой пример:\n"
             "Сколько будет **2 + 3**? Выберите правильный ответ ниже 👇"
         )
         
@@ -130,7 +130,7 @@ async def cmd_stat(message: types.Message):
     count = get_users_count()
     await message.answer(f"📊 **Статистика базы данных:**\n\nВ твоем боте сейчас накоплено: `{count}` пользователей.")
 
-# 🔥 СЕКРЕТНАЯ КОМАНДА РАССЫЛКИ (ПОЛНОСТЬЮ ЗАШИФРОВАНА И ЗАЩИЩЕНА)
+# 🔥 СЕКРЕТНАЯ КОМАНДА РАССЫЛКИ (ПОЛНОСТЬЮ ИСПРАВЛЕНА)
 @dp.message(Command("send_premium_key_99x"))
 async def cmd_send(message: types.Message):
     if message.from_user.id != ADMIN_ID:
@@ -156,7 +156,7 @@ async def cmd_send(message: types.Message):
         
         success_count = 0
         for row in rows:
-            target_user_id = row[0]  # Исправлено извлечение ID из кортежа
+            target_user_id = row[0]  # СТРОГО ИСПРАВЛЕНО: Достаем чистый ID из кортежа SQLite
             try:
                 await bot.send_message(chat_id=target_user_id, text=text_to_send, parse_mode=ParseMode.MARKDOWN)
                 success_count += 1
@@ -187,7 +187,7 @@ async def process_correct(callback_query: types.CallbackQuery):
         success_text = (
             "✅ **Проверка успешно пройдена!**\n\n"
             "Ваша персональная одноразовая ссылка для входа сгенерирована автоматически и будет работать ровно 5 минут. Жмите кнопку ниже 👇\n\n"
-            "🍏 __Для владельцев iPhone:__ Если после перехода канал отображается как недоступный, зайдите в настройки Telegram через браузер (веб-версию) and включите тумблер «Материалы деликатного характера»."
+            "🍏 __Для владельцев iPhone:__ Если после перехода канал отображается как недоступный, зайдите в настройки Telegram через браузер (веб-версию) и включите тумблер «Материалы деликатного характера»."
         )
         
         inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
@@ -216,8 +216,6 @@ async def main():
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', int(os.environ.get("PORT", 8080)))
     asyncio.create_task(site.start())
-    
-    print("🤖 Бот со всей админ-логикой успешно запущен...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
