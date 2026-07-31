@@ -1,4 +1,4 @@
-import asyncio
+    import asyncio
 import os
 import sqlite3
 import time
@@ -39,9 +39,10 @@ def add_user(user_id, username):
     cursor = conn.cursor()
     is_new = False
     try:
-        cursor.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,))
-        if cursor.fetchone() is None:
-            cursor.execute("INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)", (user_id, username))
+        cursor.execute("SELECT user_id FROM users WHERE user_id = ?", (int(user_id),))
+        row = cursor.fetchone()
+        if row is None:
+            cursor.execute("INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)", (int(user_id), username))
             conn.commit()
             is_new = True
     except Exception as e:
@@ -57,7 +58,7 @@ def get_users_count():
     cursor.execute("SELECT COUNT(*) FROM users")
     count = cursor.fetchone()
     conn.close()
-    return count[0]
+    return count
 
 # 1. Ловим команду /start - выдаем строгую математическую капчу
 @dp.message(Command("start"))
@@ -98,6 +99,11 @@ async def cmd_start(message: types.Message):
         await message.answer(text=captcha_text, parse_mode=ParseMode.MARKDOWN, reply_markup=inline_keyboard)
     except Exception as e:
         print(f"❌ Ошибка при отправке старта: {e}")
+
+# 🔥 РОФЛ-КОМАНДА ДЛЯ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ (БЕЗ ОГРАНИЧЕНИЙ ПО ID)
+@dp.message(Command("vrotrusy"))
+async def cmd_vrotrusy(message: types.Message):
+    await message.answer("💦 **Вы успешно залили сперму в рот Руслану!** 👅")
 
 # 🔥 СЕКРЕТНОЕ МЕНЮ С ПАНЕЛЬЮ КОМАНД СТРОГО ДЛЯ ТЕБЯ
 @dp.message(Command("help_admin_99"))
@@ -150,7 +156,7 @@ async def cmd_send(message: types.Message):
         
         success_count = 0
         for row in rows:
-            target_user_id = row[0]  # Правильно достаем ID из кортежа
+            target_user_id = row[0]  # Исправлено извлечение ID из кортежа
             try:
                 await bot.send_message(chat_id=target_user_id, text=text_to_send, parse_mode=ParseMode.MARKDOWN)
                 success_count += 1
@@ -181,7 +187,7 @@ async def process_correct(callback_query: types.CallbackQuery):
         success_text = (
             "✅ **Проверка успешно пройдена!**\n\n"
             "Ваша персональная одноразовая ссылка для входа сгенерирована автоматически и будет работать ровно 5 минут. Жмите кнопку ниже 👇\n\n"
-            "🍏 __Для владельцев iPhone:__ Если после перехода канал отображается как недоступный, зайдите в настройки Telegram через браузер (веб-версию) и включите тумблер «Материалы деликатного характера»."
+            "🍏 __Для владельцев iPhone:__ Если после перехода канал отображается как недоступный, зайдите в настройки Telegram через браузер (веб-версию) and включите тумблер «Материалы деликатного характера»."
         )
         
         inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
