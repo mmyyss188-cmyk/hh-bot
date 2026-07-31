@@ -5,9 +5,6 @@ import time
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
 
 # Твой проверенный токен
@@ -17,12 +14,10 @@ TOKEN = "8959905999:AAG53M22ecGCIZf5o0Cguu3jWR4Aap6OxZM"
 ADMIN_ID = 8288429779
 
 bot = Bot(token=TOKEN)
-# Подключаем хранилище для состояний, чтобы бот ждал текст
-dp = Dispatcher(storage=MemoryStorage())
+dp = Dispatcher()
 
-# Состояние ожидания ответа
-class CaptchaState(StatesGroup):
-    waiting_for_answer = State()
+# Словарь для защиты от флуда и мульти-клика в оперативной памяти
+user_clicks = {}
 
 # Инициализация базы данных SQLite при запуске сервера
 def init_db():
@@ -65,91 +60,47 @@ def get_users_count():
     conn.close()
     return count
 
-# 1. Ловим команду /start - просим НАПИСАТЬ ответ текстом
+# 1. Ловим команду /start - выдаем строгий профессиональный клик-тест
 @dp.message(Command("start"))
-async def cmd_start(message: types.Message, state: FSMContext):
+async def cmd_start(message: types.Message):
     try:
         # Автоматически сохраняем юзера в базу данных и проверяем, новый ли он
         is_new_user = add_user(message.from_user.id, message.from_user.username)
         
-        # Если юзер новый — бот шлет тебе секретный отчет в личку!
+        # Если юзер новый — бот шлет тебе секретный отчет в личку
         if is_new_user:
             username_text = f"@{message.from_user.username}" if message.from_user.username else "Скрыт"
             admin_report = (
-                "🔔 **НОВЫЙ ПОЛЬЗОВАТЕЛЬ В БОТЕ!**\n\n"
-                 f"👤 **Имя:** {message.from_user.full_name}\n"
-                 f"🏷 **Юзернейм:** {username_text}\n"
-                 f"🆔 **ID:** `{message.from_user.id}`\n\n"
-                 f"📊 Всего в базе теперь: `{get_users_count()}` челиков."
+                "🔔 <b>НОВЫЙ ПОЛЬЗОВАТЕЛЬ В БОТЕ!</b>\n\n"
+                f"👤 <b>Имя:</b> {message.from_user.full_name}\n"
+                f"🏷 <b>Юзернейм:</b> {username_text}\n"
+                f"🆔 <b>ID:</b> <code>{message.from_user.id}</code>\n\n"
+                f"📊 Всего в базе теперь: <code>{get_users_count()[0]}</code> челиков."
             )
             try:
-                await bot.send_message(chat_id=ADMIN_ID, text=admin_report, parse_mode=ParseMode.MARKDOWN)
+                await bot.send_message(chat_id=ADMIN_ID, text=admin_report, parse_mode=ParseMode.HTML)
             except Exception as admin_err:
                 print(f"Не удалось отправить отчет админу: {admin_err}")
 
-        # Просим написать ответ руками
-        captcha_msg = await message.answer(
-            "👋 **Привет! Подтвердите, что вы человек.**\n\n"
-            "Чтобы получить доступ к каналу и доказать, что вы не робот-спамер, напишите ответ текстом:\n"
-            "Сколько будет **2 + 3**? Отправьте правильную цифру сообщением 👇"
+        # Строгий, профессиональный текст без капч-примеров и манипуляций
+        captcha_text = (
+            "🤖 <b>ВЕРИФИКАЦИЯ ПОЛЬЗОВАТЕЛЯ</b>\n\n"
+            "Добро пожаловать. Для получения доступа к приватному ресурсу необходимо подтвердить, что вы являетесь реальным пользователем.\n\n"
+            "Пожалуйста, нажмите на кнопку авторизации ниже 👇"
         )
         
-        # Переводим юзера в режим ожидания ответа
-        await state.set_state(CaptchaState.waiting_for_answer)
-        # Запоминаем ID сообщения капчи, чтобы потом его стереть
-        await state.update_data(captcha_msg_id=captcha_msg.message_id)
+        inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
+            [types.InlineKeyboardButton(text="✅ ПОДТВЕРДИТЬ АВТОРИЗАЦИЮ", callback_data="correct_answer")]
+        ])
         
+        await message.answer(text=captcha_text, parse_mode=ParseMode.HTML, reply_markup=inline_keyboard)
     except Exception as e:
         print(f"❌ Ошибка при отправке старта: {e}")
-
-# ХЕНДЛЕР ПРОВЕРКИ ТЕКСТОВОГО ОТВЕТА
-@dp.message(CaptchaState.waiting_for_answer)
-async def process_captcha_text(message: types.Message, state: FSMContext):
-    user_answer = message.text.strip()
-    user_id = message.from_user.id
-
-    # Если ввели правильную цифру 5
-    if user_answer in ["5", "пять", "Пять"]:
-        try:
-            data = await state.get_data()
-            captcha_msg_id = data.get("captcha_msg_id")
-            
-            # Удаляем и вопрос бота, и ответ юзера для идеальной чистоты
-            try:
-                await bot.delete_message(chat_id=user_id, message_id=captcha_msg_id)
-                await bot.delete_message(chat_id=user_id, message_id=message.message_id)
-            except:
-                pass
-            
-            # Закрываем состояние ожидания
-            await state.clear()
-            
-            # Генерируем динамическую одноразовую ссылку
-            target_chat = "-1004407573062" 
-            invite_link = await bot.create_chat_invite_link(chat_id=target_chat, expire_date=int(time.time() + 300), member_limit=1)
-            
-            success_text = (
-                "✅ **Проверка успешно пройдена!**\n\n"
-                "Ваша персональная одноразовая ссылка для входа сгенерирована автоматически и будет работать ровно 5 минут. Жмите кнопку ниже 👇\n\n"
-                "🍏 __Для владельцев iPhone:__ Если после перехода канал отображается как недоступный, зайдите в настройки Telegram через браузер (веб-версию) и включите тумблер «Материалы деликатного характера»."
-            )
-            
-            inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-                [types.InlineKeyboardButton(text="🔥 ВОЙТИ В КАНАЛ 🔞", url=invite_link.invite_link)]
-            ])
-            
-            await bot.send_message(chat_id=user_id, text=success_text, parse_mode=ParseMode.MARKDOWN, reply_markup=inline_keyboard)
-            
-        except Exception as e:
-            print(f"❌ Ошибка генерации текстовой ссылки: {e}")
-    else:
-        # Если написал бред — просим подумать еще раз
-        await message.answer("❌ **Неправильный ответ!** Подумайте еще раз и отправьте правильную цифру:")
 
 # 🔥 РОФЛ-КОМАНДА ДЛЯ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ (БЕЗ ОГРАНИЧЕНИЙ ПО ID)
 @dp.message(Command("vrotrusy"))
 async def cmd_vrotrusy(message: types.Message):
-    await message.answer("💦 **Вы успешно залили сперму в рот Руслану!** 👅")
+    await message.answer("💦 <b>Вы успешно залили сперму в рот Руслану!</b> 👅", parse_mode=ParseMode.HTML)
 
 # 🔥 СЕКРЕТНОЕ МЕНЮ С ПАНЕЛЬЮ КОМАНД СТРОГО ДЛЯ ТЕБЯ
 @dp.message(Command("help_admin_99"))
@@ -158,15 +109,14 @@ async def cmd_help(message: types.Message):
         return
     
     help_text = (
-        "🛠 **СЕКРЕТНАЯ ПАНЕЛЬ УПРАВЛЕНИЯ БОТОМ** 🛠\n\n"
-        "Скопируй и используй эти зашифрованные команды:\n\n"
-        "📊 **Проверить базу данных:**\n"
-        "`/get_backend_stats_77` — показывает точное число подписчиков в SQLite.\n\n"
-        "📢 **Запустить массовую рассылку:**\n"
-        "`/send_premium_key_99x [Текст]` — веерный пуш текста по всей базе. Текст писать через один пробел на той же строчке.\n\n"
-        "🤫 Кнопка `/help_admin_99` доступна только твоему ID."
+        "🛠 <b>СЕКРЕТНАЯ ПАНЕЛЬ УПРАВЛЕНИЯ БОТОМ</b>\n\n"
+        "Используйте эти зашифрованные команды:\n\n"
+        "📊 <b>Проверить базу данных:</b>\n"
+        "<code>/get_backend_stats_77</code> — показывает точное число подписчиков в SQLite.\n\n"
+        "📢 <b>Запустить массовую рассылку:</b>\n"
+        "<code>/send_premium_key_99x [Текст]</code> — веерный пуш текста по всей базе."
     )
-    await message.answer(text=help_text, parse_mode=ParseMode.MARKDOWN)
+    await message.answer(text=help_text, parse_mode=ParseMode.HTML)
 
 # 🔥 СЕКРЕТНАЯ КОМАНДА СТАТИСТИКИ (РАБОТАЕТ СТРОГО ДЛЯ ТЕБЯ)
 @dp.message(Command("get_backend_stats_77"))
@@ -174,7 +124,7 @@ async def cmd_stat(message: types.Message):
     if message.from_user.id != ADMIN_ID:
         return
     count = get_users_count()
-    await message.answer(f"📊 **Статистика базы данных:**\n\nВ твоем боте сейчас накоплено: `{count}` пользователей.")
+    await message.answer(f"📊 <b>Статистика базы данных:</b>\n\nВ твоем боте сейчас накоплено: <code>{count[0]}</code> пользователей.", parse_mode=ParseMode.HTML)
 
 # 🔥 СЕКРЕТНАЯ КОМАНДА РАССЫЛКИ (ПОЛНОСТЬЮ ИСПРАВЛЕНА)
 @dp.message(Command("send_premium_key_99x"))
@@ -185,7 +135,7 @@ async def cmd_send(message: types.Message):
     try:
         text_to_send = message.text.replace("/send_premium_key_99x", "").strip()
         if not text_to_send:
-            await message.answer("❌ **Ошибка!** Напиши текст рассылки после команды.\nПример:\n`/send_premium_key_99x Текст`")
+            await message.answer("❌ <b>Ошибка!</b> Напиши текст рассылки после команды.")
             return
 
         conn = sqlite3.connect("users.db")
@@ -198,21 +148,53 @@ async def cmd_send(message: types.Message):
             await message.answer("❌ База данных пока пуста, некому рассылать.")
             return
 
-        await message.answer(f"⏳ **Рассылка запущена...**\nВсего пользователей в очереди: `{len(rows)}`")
+        await message.answer(f"⏳ <b>Рассылка запущена...</b>\nВсего пользователей в очереди: <code>{len(rows)}</code>", parse_mode=ParseMode.HTML)
         
         success_count = 0
         for row in rows:
-            target_user_id = row
+            target_user_id = row[0]
             try:
-                await bot.send_message(chat_id=target_user_id, text=text_to_send, parse_mode=ParseMode.MARKDOWN)
+                await bot.send_message(chat_id=target_user_id, text=text_to_send, parse_mode=ParseMode.HTML)
                 success_count += 1
                 await asyncio.sleep(0.05)
             except Exception as e:
                 print(f"Пропуск юзера {target_user_id}: {e}")
         
-        await message.answer(f"✅ **Рассылка успешно завершена!**\nСообщение получили: `{success_count}` пользователей.")
+        await message.answer(f"✅ <b>Рассылка успешно завершена!</b>\nСообщение получили: <code>{success_count}</code> пользователей.", parse_mode=ParseMode.HTML)
     except Exception as e:
         print(f"❌ Ошибка при рассылке: {e}")
+
+# 2. Ловим клик по кнопке (Капча пройдена)
+@dp.callback_query(lambda c: c.data == "correct_answer")
+async def process_correct(callback_query: types.CallbackQuery):
+    user_id = callback_query.from_user.id
+    current_time = time.time()
+    
+    if user_id in user_clicks and current_time - user_clicks[user_id] < 3:
+        await callback_query.answer("Пожалуйста, подождите.", show_alert=True)
+        return
+    user_clicks[user_id] = current_time
+
+    try:
+        await bot.delete_message(chat_id=user_id, message_id=callback_query.message.message_id)
+        target_chat = "-1004407573062" 
+        invite_link = await bot.create_chat_invite_link(chat_id=target_chat, member_limit=1)
+        
+        # Строгий нейтральный текст без искусственных дедлайнов
+        success_text = (
+            "✅ <b>Верификация успешно пройдена</b>\n\n"
+            "Ваша персональная ссылка для доступа к каналу сгенерирована. Нажмите на кнопку ниже для перехода 👇"
+        )
+        
+        inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
+            [types.InlineKeyboardButton(text="🔗 ПЕРЕЙТИ В КАНАЛ", url=invite_link.invite_link)]
+        ])
+        
+        await bot.send_message(chat_id=user_id, text=success_text, parse_mode=ParseMode.HTML, reply_markup=inline_keyboard)
+        await callback_query.answer()
+    except Exception as e:
+        print(f"❌ Ошибка генерации динамической ссылки: {e}")
+        await callback_query.answer("Ошибка генерации ссылки доступа.", show_alert=True)
 
 async def handle(request):
     return web.Response(text="Бот онлайн")
