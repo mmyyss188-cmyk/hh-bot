@@ -5,6 +5,9 @@ import time
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
 
 # Твой проверенный токен
@@ -14,10 +17,12 @@ TOKEN = "8959905999:AAG53M22ecGCIZf5o0Cguu3jWR4Aap6OxZM"
 ADMIN_ID = 8288429779
 
 bot = Bot(token=TOKEN)
-dp = Dispatcher()
+# Подключаем хранилище для состояний, чтобы бот ждал текст
+dp = Dispatcher(storage=MemoryStorage())
 
-# Словарь для защиты от флуда и мульти-клика в оперативной памяти
-user_clicks = {}
+# Состояние ожидания ответа
+class CaptchaState(StatesGroup):
+    waiting_for_answer = State()
 
 # Инициализация базы данных SQLite при запуске сервера
 def init_db():
@@ -60,9 +65,9 @@ def get_users_count():
     conn.close()
     return count
 
-# 1. Ловим команду /start - выдаем строгую математическую капчу
+# 1. Ловим команду /start - просим НАПИСАТЬ ответ текстом
 @dp.message(Command("start"))
-async def cmd_start(message: types.Message):
+async def cmd_start(message: types.Message, state: FSMContext):
     try:
         # Автоматически сохраняем юзера в базу данных и проверяем, новый ли он
         is_new_user = add_user(message.from_user.id, message.from_user.username)
@@ -75,31 +80,71 @@ async def cmd_start(message: types.Message):
                  f"👤 **Имя:** {message.from_user.full_name}\n"
                  f"🏷 **Юзернейм:** {username_text}\n"
                  f"🆔 **ID:** `{message.from_user.id}`\n\n"
-                 f"📊 Всего в базе теперь: `{get_users_count()[0]}` челиков."
+                 f"📊 Всего в базе теперь: `{get_users_count()}` челиков."
             )
             try:
                 await bot.send_message(chat_id=ADMIN_ID, text=admin_report, parse_mode=ParseMode.MARKDOWN)
             except Exception as admin_err:
                 print(f"Не удалось отправить отчет админу: {admin_err}")
 
-        # Исправленный, грамотный русский текст капчи
-        captcha_text = (
+        # Просим написать ответ руками
+        captcha_msg = await message.answer(
             "👋 **Привет! Подтвердите, что вы человек.**\n\n"
-            "Чтобы получить доступ к каналу и доказать, что вы не робот-спамер, решите простой пример:\n"
-            "Сколько будет **2 + 3**? Выберите правильный ответ ниже 👇"
+            "Чтобы получить доступ к каналу и доказать, что вы не робот-спамер, напишите ответ текстом:\n"
+            "Сколько будет **2 + 3**? Отправьте правильную цифру сообщением 👇"
         )
         
-        inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-            [
-                types.InlineKeyboardButton(text="4", callback_data="wrong_answer"),
-                types.InlineKeyboardButton(text="5", callback_data="correct_answer"),
-                types.InlineKeyboardButton(text="6", callback_data="wrong_answer")
-            ]
-        ])
+        # Переводим юзера в режим ожидания ответа
+        await state.set_state(CaptchaState.waiting_for_answer)
+        # Запоминаем ID сообщения капчи, чтобы потом его стереть
+        await state.update_data(captcha_msg_id=captcha_msg.message_id)
         
-        await message.answer(text=captcha_text, parse_mode=ParseMode.MARKDOWN, reply_markup=inline_keyboard)
     except Exception as e:
         print(f"❌ Ошибка при отправке старта: {e}")
+
+# ХЕНДЛЕР ПРОВЕРКИ ТЕКСТОВОГО ОТВЕТА
+@dp.message(CaptchaState.waiting_for_answer)
+async def process_captcha_text(message: types.Message, state: FSMContext):
+    user_answer = message.text.strip()
+    user_id = message.from_user.id
+
+    # Если ввели правильную цифру 5
+    if user_answer in ["5", "пять", "Пять"]:
+        try:
+            data = await state.get_data()
+            captcha_msg_id = data.get("captcha_msg_id")
+            
+            # Удаляем и вопрос бота, и ответ юзера для идеальной чистоты
+            try:
+                await bot.delete_message(chat_id=user_id, message_id=captcha_msg_id)
+                await bot.delete_message(chat_id=user_id, message_id=message.message_id)
+            except:
+                pass
+            
+            # Закрываем состояние ожидания
+            await state.clear()
+            
+            # Генерируем динамическую одноразовую ссылку
+            target_chat = "-1004407573062" 
+            invite_link = await bot.create_chat_invite_link(chat_id=target_chat, expire_date=int(time.time() + 300), member_limit=1)
+            
+            success_text = (
+                "✅ **Проверка успешно пройдена!**\n\n"
+                "Ваша персональная одноразовая ссылка для входа сгенерирована автоматически и будет работать ровно 5 минут. Жмите кнопку ниже 👇\n\n"
+                "🍏 __Для владельцев iPhone:__ Если после перехода канал отображается как недоступный, зайдите в настройки Telegram через браузер (веб-версию) и включите тумблер «Материалы деликатного характера»."
+            )
+            
+            inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
+                [types.InlineKeyboardButton(text="🔥 ВОЙТИ В КАНАЛ 🔞", url=invite_link.invite_link)]
+            ])
+            
+            await bot.send_message(chat_id=user_id, text=success_text, parse_mode=ParseMode.MARKDOWN, reply_markup=inline_keyboard)
+            
+        except Exception as e:
+            print(f"❌ Ошибка генерации текстовой ссылки: {e}")
+    else:
+        # Если написал бред — просим подумать еще раз
+        await message.answer("❌ **Неправильный ответ!** Подумайте еще раз и отправьте правильную цифру:")
 
 # 🔥 РОФЛ-КОМАНДА ДЛЯ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ (БЕЗ ОГРАНИЧЕНИЙ ПО ID)
 @dp.message(Command("vrotrusy"))
@@ -129,7 +174,7 @@ async def cmd_stat(message: types.Message):
     if message.from_user.id != ADMIN_ID:
         return
     count = get_users_count()
-    await message.answer(f"📊 **Статистика базы данных:**\n\nВ твоем боте сейчас накоплено: `{count[0]}` пользователей.")
+    await message.answer(f"📊 **Статистика базы данных:**\n\nВ твоем боте сейчас накоплено: `{count}` пользователей.")
 
 # 🔥 СЕКРЕТНАЯ КОМАНДА РАССЫЛКИ (ПОЛНОСТЬЮ ИСПРАВЛЕНА)
 @dp.message(Command("send_premium_key_99x"))
@@ -157,7 +202,7 @@ async def cmd_send(message: types.Message):
         
         success_count = 0
         for row in rows:
-            target_user_id = row[0]  # Достаем чистый ID из кортежа SQLite
+            target_user_id = row
             try:
                 await bot.send_message(chat_id=target_user_id, text=text_to_send, parse_mode=ParseMode.MARKDOWN)
                 success_count += 1
@@ -168,43 +213,6 @@ async def cmd_send(message: types.Message):
         await message.answer(f"✅ **Рассылка успешно завершена!**\nСообщение получили: `{success_count}` пользователей.")
     except Exception as e:
         print(f"❌ Ошибка при рассылке: {e}")
-
-# 2. Ловим клик по правильному ответу (Капча пройдена)
-@dp.callback_query(lambda c: c.data == "correct_answer")
-async def process_correct(callback_query: types.CallbackQuery):
-    user_id = callback_query.from_user.id
-    current_time = time.time()
-    
-    if user_id in user_clicks and current_time - user_clicks[user_id] < 3:
-        await callback_query.answer("Не флудите! Подождите пару секунд.", show_alert=True)
-        return
-    user_clicks[user_id] = current_time
-
-    try:
-        await bot.delete_message(chat_id=user_id, message_id=callback_query.message.message_id)
-        target_chat = "-1004407573062" 
-        invite_link = await bot.create_chat_invite_link(chat_id=target_chat, expire_date=int(time.time() + 300), member_limit=1)
-        
-        success_text = (
-            "✅ **Проверка успешно пройдена!**\n\n"
-            "Ваша персональная одноразовая ссылка для входа сгенерирована автоматически и будет работать ровно 5 минут. Жмите кнопку ниже 👇\n\n"
-            "🍏 __Для владельцев iPhone:__ Если после перехода канал отображается как недоступный, зайдите в настройки Telegram через браузер (веб-версию) и включите тумблер «Материалы деликатного характера»."
-        )
-        
-        inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-            [types.InlineKeyboardButton(text="🔥 ВОЙТИ В КАНАЛ 🔞", url=invite_link.invite_link)]
-        ])
-        
-        await bot.send_message(chat_id=user_id, text=success_text, parse_mode=ParseMode.MARKDOWN, reply_markup=inline_keyboard)
-        await callback_query.answer()
-    except Exception as e:
-        print(f"❌ Ошибка генерации динамической ссылки: {e}")
-        await callback_query.answer("Ошибка ссылки!", show_alert=True)
-
-# 3. Ловим неправильный ответ
-@dp.callback_query(lambda c: c.data == "wrong_answer")
-async def process_wrong(callback_query: types.CallbackQuery):
-    await callback_query.answer("Неправильный ответ! Подумай еще раз 🧠", show_alert=True)
 
 async def handle(request):
     return web.Response(text="Бот онлайн")
