@@ -90,11 +90,13 @@ async def cmd_start(message: types.Message):
         )
 
         # Строгий технический текст без капса, давления и лишних эмодзи
-        welcome_text = (
+       
+                welcome_text = (
             "Заявка на вступление в Hentai Heaven принята.\n\n"
-            "Для перехода в канал используйте персональную одноразовую ссылку. "
-            "Она будет автоматически аннулирована через 10 минут."
+            "Ссылка одноразовая и создана специально для вашего аккаунта. "
+            "Пожалуйста, перейдите по ней прямо сейчас, чтобы не потерять доступ к каналу."
         )
+
         
         inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
             [types.InlineKeyboardButton(text="🔗 Перейти в канал", url=invite_link.invite_link)]
