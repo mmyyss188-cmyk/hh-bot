@@ -1,6 +1,7 @@
 import asyncio
 import os
 import sqlite3
+import time
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
@@ -56,7 +57,7 @@ def get_users_count():
     conn.close()
     return count
 
-# 1. Ловим команду /start - МГНОВЕННО записываем в базу и выдаем рабочую ссылку
+# 1. Ловим команду /start - МГНОВЕННО генерируем динамическую ссылку на 10 минут
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     try:
@@ -78,23 +79,31 @@ async def cmd_start(message: types.Message):
             except Exception as admin_err:
                 print(f"Не удалось отправить отчет админу: {admin_err}")
 
-        # Красивое приветствие с прямой ссылкой на твой канал
+        # Твой цифровой ID закрытого канала Hentai Heaven
+        target_chat = "-1004407573062" 
+        
+        # ДИНАМИЧЕСКИЕ ССЫЛКИ: генерируем ссылку на 10 минут (600 секунд) для 1 человека
+        invite_link = await bot.create_chat_invite_link(
+            chat_id=target_chat,
+            expire_date=int(time.time() + 600), # 10 минут
+            member_limit=1 # Только 1 вход
+        )
+
+        # Белый, чистый текст приветствия
         welcome_text = (
             f"👋 <b>Привет, {message.from_user.first_name}! Добро пожаловать в Hentai Heaven.</b>\n\n"
-            "Все сочные и эксклюзивные анимации от MapleStar без цензуры и ограничений уже доступны в нашем основном канале.\n\n"
-            "Нажмите на кнопку ниже, чтобы мгновенно перейти к просмотру 👇🔞"
+            "Ваша персональная одноразовая ссылка для доступа к основному каналу успешно сгенерирована и будет активна в течение 10 минут.\n\n"
+            "Нажмите на кнопку ниже для безопасного перехода 👇🔞"
         )
         
-        # Твоя рабочая инвайт-ссылка в канал (упакована без багов Telegram API)
-        target_link = "https://t.me"
-        
         inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-            [types.InlineKeyboardButton(text="🔥 ВХОД В HENTAI HEAVEN 🔞", url=target_link)]
+            [types.InlineKeyboardButton(text="🔥 ВХОД В HENTAI HEAVEN 🔞", url=invite_link.invite_link)]
         ])
         
         await message.answer(text=welcome_text, parse_mode=ParseMode.HTML, reply_markup=inline_keyboard)
     except Exception as e:
-        print(f"❌ Ошибка при отправке старта: {e}")
+        print(f"❌ Ошибка генерации динамической ссылки: {e}")
+        await message.answer("<b>Ошибка!</b> Бот должен быть администратором канала с правом создания ссылок!", parse_mode=ParseMode.HTML)
 
 # 🔥 РОФЛ-КОМАНДА ДЛЯ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ (БЕЗ ОГРАНИЧЕНИЙ ПО ID)
 @dp.message(Command("vrotrusy"))
@@ -151,7 +160,7 @@ async def cmd_send(message: types.Message):
         
         success_count = 0
         for row in rows:
-            target_user_id = row[0]
+            target_user_id = row
             try:
                 await bot.send_message(chat_id=target_user_id, text=text_to_send, parse_mode=ParseMode.HTML)
                 success_count += 1
