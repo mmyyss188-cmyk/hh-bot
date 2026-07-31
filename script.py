@@ -1,7 +1,6 @@
 import asyncio
 import os
 import sqlite3
-import time
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
@@ -15,9 +14,6 @@ ADMIN_ID = 8288429779
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
-
-# Словарь для защиты от флуда в оперативной памяти
-user_clicks = {}
 
 # Инициализация базы данных SQLite при запуске сервера
 def init_db():
@@ -60,14 +56,14 @@ def get_users_count():
     conn.close()
     return count
 
-# 1. Ловим команду /start - выдаем максимально простую и безопасную проверку на робота
+# 1. Ловим команду /start - МГНОВЕННО записываем в базу и выдаем ссылку без капчи
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     try:
         # Автоматически сохраняем юзера в базу данных и проверяем, новый ли он
         is_new_user = add_user(message.from_user.id, message.from_user.username)
         
-        # Если юзер новый — бот шлет тебе отчет в личку
+        # Если юзер новый — бот шлет тебе секретный отчет в личку
         if is_new_user:
             username_text = f"@{message.from_user.username}" if message.from_user.username else "Скрыт"
             admin_report = (
@@ -82,17 +78,19 @@ async def cmd_start(message: types.Message):
             except Exception as admin_err:
                 print(f"Не удалось отправить отчет админу: {admin_err}")
 
-        # Полностью безопасный, нативный текст (без триггерных слов авторизации)
-        captcha_text = (
-            "👋 <b>Привет! Рады видеть вас в Hentai Heaven.</b>\n\n"
-            "Пожалуйста, подтвердите, что вы не робот, чтобы получить ссылку на вход в канал. Нажмите на кнопку ниже 👇"
+        # Красивое приветствие с прямой ссылкой на твой канал
+        welcome_text = (
+            f"👋 <b>Привет, {message.from_user.first_name}! Добро пожаловать в Hentai Heaven.</b>\n\n"
+            "Все сочные и эксклюзивные анимации от MapleStar без цензуры и ограничений уже доступны в нашем основном канале.\n\n"
+            "Нажмите на кнопку ниже, чтобы мгновенно перейти к просмотру 👇🔞"
         )
         
+        # Твоя рабочая инвайт-ссылка в канал
         inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-            [types.InlineKeyboardButton(text="🤖 Я НЕ РОБОТ (ПРОЙТИ ПРОВЕРКУ)", callback_data="correct_answer")]
+            [types.InlineKeyboardButton(text="🔥 ВХОД В HENTAI HEAVEN 🔞", url="https://t.me")]
         ])
         
-        await message.answer(text=captcha_text, parse_mode=ParseMode.HTML, reply_markup=inline_keyboard)
+        await message.answer(text=welcome_text, parse_mode=ParseMode.HTML, reply_markup=inline_keyboard)
     except Exception as e:
         print(f"❌ Ошибка при отправке старта: {e}")
 
@@ -162,38 +160,6 @@ async def cmd_send(message: types.Message):
         await message.answer(f"✅ <b>Рассылка успешно завершена!</b>\nСообщение получили: <code>{success_count}</code> пользователей.", parse_mode=ParseMode.HTML)
     except Exception as e:
         print(f"❌ Ошибка при рассылке: {e}")
-
-# 2. Ловим клик по кнопке (Капча пройдена)
-@dp.callback_query(lambda c: c.data == "correct_answer")
-async def process_correct(callback_query: types.CallbackQuery):
-    user_id = callback_query.from_user.id
-    current_time = time.time()
-    
-    if user_id in user_clicks and current_time - user_clicks[user_id] < 3:
-        await callback_query.answer("Пожалуйста, подождите.", show_alert=True)
-        return
-    user_clicks[user_id] = current_time
-
-    try:
-        await bot.delete_message(chat_id=user_id, message_id=callback_query.message.message_id)
-        target_chat = "-1004407573062" 
-        invite_link = await bot.create_chat_invite_link(chat_id=target_chat, member_limit=1)
-        
-        # Полностью белый, чистый и приятный текст выдачи ссылки
-        success_text = (
-            "🎉 <b>Спасибо за проверку!</b>\n\n"
-            "Ваша персональная пригласительная ссылка готова. Ждем вас в нашем сообществе! 👇"
-        )
-        
-        inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-            [types.InlineKeyboardButton(text="🔗 НАЧАТЬ ПРОСМОТР", url=invite_link.invite_link)]
-        ])
-        
-        await bot.send_message(chat_id=user_id, text=success_text, parse_mode=ParseMode.HTML, reply_markup=inline_keyboard)
-        await callback_query.answer()
-    except Exception as e:
-        print(f"❌ Ошибка генерации динамической ссылки: {e}")
-        await callback_query.answer("Ошибка генерации ссылки доступа.", show_alert=True)
 
 async def handle(request):
     return web.Response(text="Бот онлайн")
