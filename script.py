@@ -10,6 +10,9 @@ from aiohttp import web
 # Твой проверенный токен
 TOKEN = "8959905999:AAG53M22ecGCIZf5o0Cguu3jWR4Aap6OxZM"
 
+# ТВОЙ ЛИЧНЫЙ ТЕЛЕГРАМ ID (Обязательно замени 123456789 на свои реальные цифры из @userinfobot!)
+ADMIN_ID = 123456789  
+
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
@@ -34,37 +37,56 @@ def init_db():
 def add_user(user_id, username):
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
+    is_new = False
     try:
-        cursor.execute("INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)", (user_id, username))
-        conn.commit()
+        cursor.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,))
+        if cursor.fetchone() is None:
+            cursor.execute("INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)", (user_id, username))
+            conn.commit()
+            is_new = True
     except Exception as e:
         print(f"Ошибка базы данных: {e}")
     finally:
         conn.close()
+    return is_new
 
 # Функция для подсчета общего количества людей в базе
 def get_users_count():
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM users")
-    count = cursor.fetchone()[0]
+    count = cursor.fetchone()
     conn.close()
-    return count
+    return count[0]
 
 # 1. Ловим команду /start - выдаем строгую математическую капчу
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     try:
-        # Автоматически сохраняем юзера в базу данных
-        add_user(message.from_user.id, message.from_user.username)
+        # Автоматически сохраняем юзера в базу данных и проверяем, новый ли он
+        is_new_user = add_user(message.from_user.id, message.from_user.username)
         
+        # Если юзер новый — бот шлет тебе секретный отчет в личку!
+        if is_new_user:
+            username_text = f"@{message.from_user.username}" if message.from_user.username else "Скрыт"
+            admin_report = (
+                "🔔 **НОВЫЙ ПОЛЬЗОВАТЕЛЬ В БОТЕ!**\n\n"
+                 f"👤 **Имя:** {message.from_user.full_name}\n"
+                 f"🏷 **Юзернейм:** {username_text}\n"
+                 f"🆔 **ID:** `{message.from_user.id}`\n\n"
+                 f"📊 Всего в базе теперь: `{get_users_count()}` челиков."
+            )
+            try:
+                await bot.send_message(chat_id=ADMIN_ID, text=admin_report, parse_mode=ParseMode.MARKDOWN)
+            except Exception as admin_err:
+                print(f"Не удалось отправить отчет админу: {admin_err}")
+
         captcha_text = (
             "👋 **Привет! Подтвердите, что вы человек.**\n\n"
             "Чтобы получить доступ к каналу и доказать, что вы не робот-спамер, решите простой пример:\n"
             "Сколько будет **2 + 3**? Выберите правильный ответ ниже 👇"
         )
         
-        # Инлайн-кнопки с вариантами ответов (правильный - 5)
         inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
             [
                 types.InlineKeyboardButton(text="4", callback_data="wrong_answer"),
@@ -77,27 +99,27 @@ async def cmd_start(message: types.Message):
     except Exception as e:
         print(f"❌ Ошибка при отправке старта: {e}")
 
-# Секретная админская команда для проверки статистики базы данных
-@dp.message(Command("stat"))
+# 🔥 СЕКРЕТНАЯ КОМАНДА СТАТИСТИКИ (УГАДАТЬ НЕВОЗМОЖНО)
+@dp.message(Command("get_backend_stats_77"))
 async def cmd_stat(message: types.Message):
-    try:
-        count = get_users_count()
-        await message.answer(f"📊 **Статистика базы данных:**\n\nВ твоем боте сейчас накоплено: `{count}` пользователей.")
-    except Exception as e:
-        print(f"❌ Ошибка команды stat: {e}")
+    if message.from_user.id != ADMIN_ID:
+        return
+    count = get_users_count()
+    await message.answer(f"📊 **Статистика базы данных:**\n\nВ твоем боте сейчас накоплено: `{count}` пользователей.")
 
-# 🔥 СЕКРЕТНАЯ КОМАНДА РАССЫЛКИ ДЛЯ АДМИНА (ПОЛНОСТЬЮ ИСПРАВЛЕНА)
-@dp.message(Command("send"))
+# 🔥 СЕКРЕТНАЯ КОМАНДА РАССЫЛКИ (ПОЛНОСТЬЮ ЗАШИФРОВАНА И ЗАЩИЩЕНА)
+@dp.message(Command("send_premium_key_99x"))
 async def cmd_send(message: types.Message):
+    # Жесткая проверка по твоему ID
+    if message.from_user.id != ADMIN_ID:
+        return
+
     try:
-        # Извлекаем текст рекламы, который идет ПОСЛЕ команды /send
-        text_to_send = message.text.replace("/send", "").strip()
-        
+        text_to_send = message.text.replace("/send_premium_key_99x", "").strip()
         if not text_to_send:
-            await message.answer("❌ **Ошибка!** Напиши текст рассылки после команды.\nПример:\n`/send Привет! Новый фулл залит!`")
+            await message.answer("❌ **Ошибка!** Напиши текст рассылки после команды.\nПример:\n`/send_premium_key_99x Текст`")
             return
 
-        # Достаем все ID из базы данных
         conn = sqlite3.connect("users.db")
         cursor = conn.cursor()
         cursor.execute("SELECT user_id FROM users")
@@ -112,11 +134,10 @@ async def cmd_send(message: types.Message):
         
         success_count = 0
         for row in rows:
-            target_user_id = row[0]  # Корректно достаем ID из кортежа
+            target_user_id = row[0]
             try:
                 await bot.send_message(chat_id=target_user_id, text=text_to_send, parse_mode=ParseMode.MARKDOWN)
                 success_count += 1
-                # Микропауза 0.05 сек, чтобы Telegram не забанил за флуд
                 await asyncio.sleep(0.05)
             except Exception as e:
                 print(f"Пропуск юзера {target_user_id}: {e}")
@@ -131,27 +152,20 @@ async def process_correct(callback_query: types.CallbackQuery):
     user_id = callback_query.from_user.id
     current_time = time.time()
     
-    # ТРОТТЛИНГ (Антифлуд): защита от спам-кликов
     if user_id in user_clicks and current_time - user_clicks[user_id] < 3:
         await callback_query.answer("Не флудите! Подождите пару секунд.", show_alert=True)
         return
     user_clicks[user_id] = current_time
 
     try:
-        # УДАЛЕНИЕ СООБЩЕНИЯ (Защита от мульти-клика): стираем капчу сразу
         await bot.delete_message(chat_id=user_id, message_id=callback_query.message.message_id)
-        
-        # Твой проверенный цифровой ID канала Hentai Heaven
         target_chat = "-1004407573062" 
-        
-        # ДИНАМИЧЕСКИЕ ССЫЛКИ: создаем одноразовую ссылку на 5 минут строго для 1 человека
         invite_link = await bot.create_chat_invite_link(chat_id=target_chat, expire_date=int(time.time() + 300), member_limit=1)
         
-        # Финальный текст с инструкцией для обхода блокировок на iOS
         success_text = (
             "✅ **Проверка успешно пройдена!**\n\n"
             "Ваша персональная одноразовая ссылка для входа сгенерирована автоматически и будет работать ровно 5 минут. Жмите кнопку ниже 👇\n\n"
-            "🍏 __Для владельцев iPhone:__ Если после перехода канал отображается как недоступный, зайдите в настройки Telegram через браузер (веб-версию) и включите тумблер «Материалы деликатного характера»."
+            "🍏 __Для владельцев iPhone:__ Если после перехода канал отображается как недоступный, зайдите в настройки Telegram через браузер (веб-версию) and включите тумблер «Материалы деликатного характера»."
         )
         
         inline_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
@@ -160,10 +174,9 @@ async def process_correct(callback_query: types.CallbackQuery):
         
         await bot.send_message(chat_id=user_id, text=success_text, parse_mode=ParseMode.MARKDOWN, reply_markup=inline_keyboard)
         await callback_query.answer()
-        
     except Exception as e:
         print(f"❌ Ошибка генерации динамической ссылки: {e}")
-        await callback_query.answer("Ошибка! Проверьте, добавлен ли бот в администраторы канала с правами создания ссылок!", show_alert=True)
+        await callback_query.answer("Ошибка ссылки!", show_alert=True)
 
 # 3. Ловим неправильный ответ
 @dp.callback_query(lambda c: c.data == "wrong_answer")
@@ -174,9 +187,7 @@ async def handle(request):
     return web.Response(text="Бот онлайн")
 
 async def main():
-    # Автоматически создаем таблицу базы данных sqlite при старте
     init_db()
-    
     app = web.Application()
     app.router.add_get('/', handle)
     runner = web.AppRunner(app)
