@@ -16,8 +16,9 @@ ADMIN_ID = 8288429779
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# Словарь для защиты от флуда в оперативной памяти
-user_clicks = {}
+# Встроенный бэкенд-буфер для хранения ID последних сообщений и антифлуда
+# Хранит структуру вида: {user_id: {"last_msg_id": 123, "last_click_time": 17123456}}
+user_storage = {}
 
 # Инициализация базы данных SQLite при запуске сервера
 def init_db():
@@ -60,12 +61,13 @@ def get_users_count():
     conn.close()
     return count
 
-# 1. Ловим команду /start - МГНОВЕННО генерируем динамическую ссылку на 10 минут
+# 1. Ловим команду /start - Проверяем память, чистим старое и выдаем новую ссылку на 10 минут
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
+    user_id = message.from_user.id
     try:
         # Автоматически сохраняем юзера в базу данных и проверяем, новый ли он
-        is_new_user = add_user(message.from_user.id, message.from_user.username)
+        is_new_user = add_user(user_id, message.from_user.username)
         
         # Если юзер новый — бот шлет тебе секретный отчет в личку
         if is_new_user:
@@ -82,17 +84,30 @@ async def cmd_start(message: types.Message):
             except Exception as admin_err:
                 print(f"Не удалось отправить отчет админу: {admin_err}")
 
+        # Инициализируем ячейку в памяти для юзера, если её нет
+        if user_id not in user_storage:
+            user_storage[user_id] = {"last_msg_id": None}
+
+        # МЕХАНИКА ОЧИСТКИ (ТЗ друга): Если бот уже отправлял сообщение — удаляем его
+        old_msg_id = user_storage[user_id].get("last_msg_id")
+        if old_msg_id:
+            try:
+                await bot.delete_message(chat_id=user_id, message_id=old_msg_id)
+            except Exception as delete_err:
+                # На случай, если юзер сам вручную стёр сообщение раньше бота
+                print(f"Старое сообщение уже удалено: {delete_err}")
+
         # Твой цифровой ID закрытого канала Hentai Heaven
         target_chat = "-1004407573062" 
         
-        # ДИНАМИЧЕСКИЕ ССЫЛКИ: генерируем ссылку на 10 минут (600 секунд) для 1 человека
+        # Генерируем динамическую одноразовую ссылку на 10 минут строго для 1 человека
         invite_link = await bot.create_chat_invite_link(
             chat_id=target_chat,
             expire_date=int(time.time() + 600), # 10 минут
             member_limit=1 # Только 1 вход
         )
 
-        # Твой новый кастомный текст с идеальными отступами
+        # Твой кастомный проверенный текст
         welcome_text = (
             "Заявка на вступление в Hentai Heaven принята.\n\n"
             "Ссылка одноразовая и создана специально для вашего аккаунта. "
@@ -103,9 +118,14 @@ async def cmd_start(message: types.Message):
             [types.InlineKeyboardButton(text="🔗 Перейти в канал", url=invite_link.invite_link)]
         ])
         
-        await message.answer(text=welcome_text, parse_mode=ParseMode.HTML, reply_markup=inline_keyboard)
+        # Отправляем новое сообщение
+        new_message = await message.answer(text=welcome_text, parse_mode=ParseMode.HTML, reply_markup=inline_keyboard)
+        
+        # ЗАПОМИНАЕМ ID нового сообщения для удаления в следующий раз
+        user_storage[user_id]["last_msg_id"] = new_message.message_id
+
     except Exception as e:
-        print(f"❌ Ошибка генерации динамической ссылки: {e}")
+        print(f"❌ Ошибка в хендлере старта: {e}")
         await message.answer("Ошибка генерации ссылки доступа. Пожалуйста, обратитесь к администратору.", parse_mode=ParseMode.HTML)
 
 # 🔥 РОФЛ-КОМАНДА ДЛЯ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ (БЕЗ ОГРАНИЧЕНИЙ ПО ID)
@@ -163,7 +183,7 @@ async def cmd_send(message: types.Message):
         
         success_count = 0
         for row in rows:
-            target_user_id = row
+            target_user_id = row[0] # Исправлено: берем чистый элемент из кортежа SQLite
             try:
                 await bot.send_message(chat_id=target_user_id, text=text_to_send, parse_mode=ParseMode.HTML)
                 success_count += 1
